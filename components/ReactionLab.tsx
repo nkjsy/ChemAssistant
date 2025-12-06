@@ -2,18 +2,23 @@ import React, { useState } from 'react';
 import { Molecule, ReactionResult } from '../types';
 import MoleculeRenderer from './MoleculeRenderer';
 import { simulateReaction } from '../services/geminiService';
-import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw, Search } from 'lucide-react';
+import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw, Search, Plus, Save } from 'lucide-react';
 
 interface ReactionLabProps {
   savedMolecules: Molecule[];
+  onSaveProduct: (molecule: Molecule) => void;
 }
 
-const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
+const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct }) => {
   const [reactants, setReactants] = useState<Molecule[]>([]);
   const [result, setResult] = useState<ReactionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Save Product State
+  const [editingProduct, setEditingProduct] = useState<Molecule | null>(null);
+  const [newName, setNewName] = useState('');
 
   const toggleReactant = (mol: Molecule) => {
     if (reactants.find(r => r.id === mol.id)) {
@@ -43,6 +48,22 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
     setReactants([]);
     setResult(null);
     setError(null);
+  };
+
+  const initiateSave = (mol: Molecule) => {
+    setEditingProduct(mol);
+    setNewName(mol.name);
+  };
+
+  const confirmSave = () => {
+    if (editingProduct && newName.trim()) {
+      onSaveProduct({
+        ...editingProduct,
+        name: newName.trim(),
+        id: `saved-prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      });
+      setEditingProduct(null);
+    }
   };
 
   const filteredMolecules = savedMolecules.filter(mol => 
@@ -109,7 +130,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
       </div>
 
       {/* Reaction Stage */}
-      <div className="flex-1 bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col min-h-0">
+      <div className="flex-1 bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col min-h-0 relative">
         <div className="flex items-center justify-between mb-4">
            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
              <FlaskConical className="text-indigo-600" /> Reaction Chamber
@@ -169,10 +190,10 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
               {result.explanation}
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 pb-4">
               {result.products.map(prod => (
-                <div key={prod.id} className="flex flex-col items-center gap-2">
-                   <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 w-full aspect-[4/3] flex items-center justify-center overflow-hidden">
+                <div key={prod.id} className="flex flex-col items-center gap-2 group">
+                   <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 w-full aspect-[4/3] flex items-center justify-center overflow-hidden relative">
                       <MoleculeRenderer 
                         molecule={prod} 
                         width={250} 
@@ -180,13 +201,65 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
                         isAutoLayout={true} 
                       />
                    </div>
-                   <span className="font-semibold text-slate-700">{prod.name}</span>
+                   <div className="flex items-center justify-between w-full px-2">
+                      <span className="font-semibold text-slate-700 truncate flex-1" title={prod.name}>{prod.name}</span>
+                      <button 
+                        onClick={() => initiateSave(prod)}
+                        className="ml-2 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors flex items-center gap-1 text-xs font-medium"
+                        title="Add to Inventory"
+                      >
+                         <Plus size={14} /> Add
+                      </button>
+                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {/* Save Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Save className="text-indigo-600" size={20} />
+                  Save Product
+                </h3>
+                
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Molecule Name</label>
+                    <input 
+                        type="text" 
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        autoFocus
+                        placeholder="Enter molecule name"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      This molecule will be added to your inventory for use in future reactions.
+                    </p>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                    <button 
+                        onClick={() => setEditingProduct(null)}
+                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={confirmSave}
+                        disabled={!newName.trim()}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium transition-colors"
+                    >
+                        Save to Inventory
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

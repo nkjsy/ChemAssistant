@@ -73,7 +73,7 @@ const App: React.FC = () => {
           {activeTab === Tab.BUILDER ? (
             <Builder onSave={handleSaveMolecule} />
           ) : (
-            <ReactionLab savedMolecules={savedMolecules} />
+            <ReactionLab savedMolecules={savedMolecules} onSaveProduct={handleSaveMolecule} />
           )}
         </div>
       </main>
