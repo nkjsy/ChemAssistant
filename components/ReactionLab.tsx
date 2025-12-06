@@ -110,7 +110,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct
                   className={`relative p-2 rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-indigo-200'}`}
                 >
                   <div className="pointer-events-none scale-75 origin-top-left -mb-4">
-                     <MoleculeRenderer molecule={mol} width={150} height={100} />
+                     <MoleculeRenderer molecule={mol} width={150} height={100} showControls={false} />
                   </div>
                   <div className="mt-2 text-xs font-semibold text-center truncate px-1">
                     {mol.name}

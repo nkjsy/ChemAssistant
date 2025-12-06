@@ -13,6 +13,7 @@ interface MoleculeRendererProps {
   isAutoLayout?: boolean; // If true, runs d3 simulation to position atoms
   mode?: 'build' | 'erase';
   onAtomDelete?: (atomId: string) => void;
+  showControls?: boolean;
 }
 
 const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
@@ -23,7 +24,8 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   onUpdate,
   isAutoLayout = false,
   mode = 'build',
-  onAtomDelete
+  onAtomDelete,
+  showControls = true
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   
@@ -274,7 +276,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     <div 
       className={`relative bg-white select-none overflow-hidden ${interactive ? (mode === 'erase' ? 'cursor-pointer' : 'cursor-crosshair') : 'cursor-move'}`} 
       style={{ width, height }}
-      onWheel={handleWheel}
+      onWheel={showControls ? handleWheel : undefined}
     >
       {!internalMolecule.atoms.length && (
          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
@@ -335,17 +337,19 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
       </svg>
       
       {/* Zoom Controls */}
-      <div className="absolute top-2 right-2 flex flex-col gap-1 bg-white/90 rounded-lg shadow border border-slate-200 p-1">
-         <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
-           <ZoomIn size={16}/>
-         </button>
-         <button onClick={(e) => { e.stopPropagation(); handleZoom(0.8); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
-           <ZoomOut size={16}/>
-         </button>
-         <button onClick={handleResetZoom} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Reset View">
-           <Maximize size={16}/>
-         </button>
-      </div>
+      {showControls && (
+        <div className="absolute top-2 right-2 flex flex-col gap-1 bg-white/90 rounded-lg shadow border border-slate-200 p-1">
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
+             <ZoomIn size={16}/>
+           </button>
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(0.8); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
+             <ZoomOut size={16}/>
+           </button>
+           <button onClick={handleResetZoom} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Reset View">
+             <Maximize size={16}/>
+           </button>
+        </div>
+      )}
 
       {/* Name display for static molecules */}
       {!interactive && (
