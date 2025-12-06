@@ -144,13 +144,26 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     }
 
     if (selectedAtomId && selectedAtomId !== atomId) {
-      // Create bond
-      const bondExists = internalMolecule.bonds.some(b => 
+      // Check if bond exists to modify or create new
+      const existingBondIndex = internalMolecule.bonds.findIndex(b => 
         (b.sourceAtomId === selectedAtomId && b.targetAtomId === atomId) ||
         (b.targetAtomId === selectedAtomId && b.sourceAtomId === atomId)
       );
 
-      if (!bondExists) {
+      if (existingBondIndex >= 0) {
+        // Cycle Bond Order: 1 -> 2 -> 3 -> 1
+        const bond = internalMolecule.bonds[existingBondIndex];
+        const newOrder = bond.order === 1 ? 2 : (bond.order === 2 ? 3 : 1);
+        
+        const updatedBonds = [...internalMolecule.bonds];
+        updatedBonds[existingBondIndex] = { ...bond, order: newOrder as 1|2|3 };
+        
+        const updated = { ...internalMolecule, bonds: updatedBonds };
+        setInternalMolecule(updated);
+        if (onUpdate) onUpdate(updated);
+        // Note: We keep selectedAtomId active to allow repeated clicks to cycle order
+      } else {
+        // Create new single bond
         const newBond: BondData = {
           id: `bond-${Date.now()}`,
           sourceAtomId: selectedAtomId,
@@ -160,13 +173,58 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         const updated = { ...internalMolecule, bonds: [...internalMolecule.bonds, newBond] };
         setInternalMolecule(updated);
         if (onUpdate) onUpdate(updated);
+        // Keep selectedAtomId active
       }
-      setSelectedAtomId(null);
     } else {
       setSelectedAtomId(atomId === selectedAtomId ? null : atomId);
     }
   };
 
+  const renderBond = (bond: BondData) => {
+    const source = internalMolecule.atoms.find(a => a.id === bond.sourceAtomId);
+    const target = internalMolecule.atoms.find(a => a.id === bond.targetAtomId);
+    if (!source || !target) return null;
+
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return null;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+    
+    const offset = 3.5; // pixels separation for multiple bonds
+
+    const lines = [];
+    
+    if (bond.order === 1) {
+       lines.push({ x1: source.x, y1: source.y, x2: target.x, y2: target.y });
+    } else if (bond.order === 2) {
+       lines.push({ x1: source.x + nx * offset, y1: source.y + ny * offset, x2: target.x + nx * offset, y2: target.y + ny * offset });
+       lines.push({ x1: source.x - nx * offset, y1: source.y - ny * offset, x2: target.x - nx * offset, y2: target.y - ny * offset });
+    } else if (bond.order === 3) {
+       lines.push({ x1: source.x, y1: source.y, x2: target.x, y2: target.y });
+       lines.push({ x1: source.x + nx * offset * 1.8, y1: source.y + ny * offset * 1.8, x2: target.x + nx * offset * 1.8, y2: target.y + ny * offset * 1.8 });
+       lines.push({ x1: source.x - nx * offset * 1.8, y1: source.y - ny * offset * 1.8, x2: target.x - nx * offset * 1.8, y2: target.y - ny * offset * 1.8 });
+    }
+
+    return (
+      <g key={bond.id}>
+         {/* Invisible wide hit area to potentially support bond clicking in future */}
+         <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke="transparent" strokeWidth="15" />
+         {lines.map((l, i) => (
+           <line 
+             key={i} 
+             x1={l.x1} y1={l.y1} 
+             x2={l.x2} y2={l.y2} 
+             stroke="#94a3b8" 
+             strokeWidth="2.5" 
+             strokeLinecap="round" 
+           />
+         ))}
+      </g>
+    );
+  };
 
   return (
     <div className={`relative bg-white select-none ${interactive ? (mode === 'erase' ? 'cursor-pointer' : 'cursor-crosshair') : ''}`} style={{ width, height }}>
@@ -186,24 +244,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         viewBox={`0 0 ${width} ${height}`}
       >
         {/* Render Bonds */}
-        {internalMolecule.bonds.map(bond => {
-          const source = internalMolecule.atoms.find(a => a.id === bond.sourceAtomId);
-          const target = internalMolecule.atoms.find(a => a.id === bond.targetAtomId);
-          if (!source || !target) return null;
-
-          return (
-            <line
-              key={bond.id}
-              x1={source.x}
-              y1={source.y}
-              x2={target.x}
-              y2={target.y}
-              stroke="#94a3b8"
-              strokeWidth={bond.order * 3}
-              strokeLinecap="round"
-            />
-          );
-        })}
+        {internalMolecule.bonds.map(bond => renderBond(bond))}
 
         {/* Render Atoms */}
         {internalMolecule.atoms.map(atom => {
