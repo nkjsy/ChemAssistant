@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Molecule, ReactionResult } from '../types';
 import MoleculeRenderer from './MoleculeRenderer';
 import { simulateReaction } from '../services/geminiService';
-import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw } from 'lucide-react';
+import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw, Search } from 'lucide-react';
 
 interface ReactionLabProps {
   savedMolecules: Molecule[];
@@ -13,6 +13,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
   const [result, setResult] = useState<ReactionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const toggleReactant = (mol: Molecule) => {
     if (reactants.find(r => r.id === mol.id)) {
@@ -44,6 +45,10 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
     setError(null);
   };
 
+  const filteredMolecules = savedMolecules.filter(mol => 
+    mol.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col h-full gap-6">
       {/* Reactant Selection */}
@@ -51,13 +56,31 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
         <h3 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-2">
           <Beaker size={16} /> Inventory
         </h3>
+        
+        {savedMolecules.length > 0 && (
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search molecules..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+            />
+          </div>
+        )}
+
         {savedMolecules.length === 0 ? (
           <div className="text-center py-8 text-slate-400 text-sm">
             No molecules created yet. Build some in the editor!
           </div>
+        ) : filteredMolecules.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-sm">
+            No matching molecules found.
+          </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {savedMolecules.map(mol => {
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-2">
+            {filteredMolecules.map(mol => {
               const isSelected = !!reactants.find(r => r.id === mol.id);
               return (
                 <div 
@@ -86,7 +109,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
       </div>
 
       {/* Reaction Stage */}
-      <div className="flex-1 bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col">
+      <div className="flex-1 bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-4">
            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
              <FlaskConical className="text-indigo-600" /> Reaction Chamber
@@ -99,7 +122,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
         </div>
 
         {!result && !loading && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-6">
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 overflow-y-auto">
             <div className="flex flex-wrap justify-center gap-4 items-center min-h-[100px]">
                {reactants.length === 0 && <span className="text-slate-400 italic">Select reactants from inventory...</span>}
                {reactants.map((r, i) => (
@@ -136,7 +159,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules }) => {
         )}
 
         {result && (
-          <div className="flex-1 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex-1 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto">
             {/* Equation Header */}
             <div className="bg-slate-900 text-white p-4 rounded-lg shadow-inner text-center font-mono text-lg md:text-xl">
               {result.equation}
