@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Molecule, AtomData, BondData, ElementType } from '../types';
 import { ELEMENT_COLORS } from '../constants';
-import { Atom as AtomIcon } from 'lucide-react';
+import { Atom as AtomIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 interface MoleculeRendererProps {
   molecule: Molecule;
@@ -26,10 +26,15 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   onAtomDelete
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  // Local state to track atoms for drag operations if interactive
+  
   const [internalMolecule, setInternalMolecule] = useState<Molecule>(molecule);
   const [draggedAtomId, setDraggedAtomId] = useState<string | null>(null);
   const [selectedAtomId, setSelectedAtomId] = useState<string | null>(null);
+  
+  // Zoom and Pan State
+  const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const lastPanRef = useRef<{ x: number, y: number } | null>(null);
   const isDraggingRef = useRef(false);
 
   // Sync internal state with props
@@ -43,11 +48,8 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
           y: height/2 + (Math.random() - 0.5) * 50 
         }));
         
-        // Safety: Filter bonds to ensure they connect existing atoms to prevent d3 crash
         const atomIds = new Set(simulationAtoms.map(a => a.id));
         
-        // CRITICAL FIX: Map 'sourceAtomId' to 'source' and 'targetAtomId' to 'target'
-        // D3 forceLink specifically looks for 'source' and 'target' properties.
         const simulationBonds = molecule.bonds
           .filter(b => atomIds.has(b.sourceAtomId) && atomIds.has(b.targetAtomId))
           .map(b => ({
@@ -63,7 +65,6 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
           .force("collide", d3.forceCollide(30));
 
         simulation.on("tick", () => {
-          // Update internal state with new positions
           setInternalMolecule(prev => ({
             ...prev,
             atoms: simulationAtoms.map(sa => ({
@@ -72,8 +73,6 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
               x: (sa as any).x,
               y: (sa as any).y
             })),
-            // We don't update bonds here because D3 modifies the simulationBonds array in place
-            // but we render based on IDs which remain constant.
           }));
         });
 
@@ -84,47 +83,94 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         };
     } else {
        // Sync state from props if we are not currently dragging
-       // This ensures "Add Atom" works while keeping dragging smooth
        if (!draggedAtomId) {
          setInternalMolecule(molecule);
        }
     }
   }, [molecule, isAutoLayout, width, height, draggedAtomId]);
 
-  // Handle Dragging manually (if interactive)
-  const handlePointerDown = (e: React.PointerEvent, atomId: string) => {
-    if (!interactive) return;
-    if (mode === 'erase') return; // Disable dragging in erase mode
+  // Zoom Logic
+  const handleZoom = (factor: number) => {
+    setTransform(prev => {
+      const newK = Math.max(0.2, Math.min(5, prev.k * factor));
+      const cx = width / 2;
+      const cy = height / 2;
+      // Convert center to world space using old transform
+      const wx = (cx - prev.x) / prev.k;
+      const wy = (cy - prev.y) / prev.k;
+      // Calculate new x,y to keep world center at screen center
+      const newX = cx - wx * newK;
+      const newY = cy - wy * newK;
+      return { k: newK, x: newX, y: newY };
+    });
+  };
 
+  const handleResetZoom = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setTransform({ k: 1, x: 0, y: 0 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    // Basic wheel zoom
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    handleZoom(factor);
+  };
+
+  // Interaction Handlers
+  const handleSvgPointerDown = (e: React.PointerEvent) => {
+    // Start panning on background click
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsPanning(true);
+    lastPanRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleAtomPointerDown = (e: React.PointerEvent, atomId: string) => {
+    if (!interactive) return;
+    if (mode === 'erase') return; 
+
+    e.stopPropagation(); // Stop background pan
     e.currentTarget.setPointerCapture(e.pointerId);
     setDraggedAtomId(atomId);
     isDraggingRef.current = false;
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!interactive || !draggedAtomId || !svgRef.current) return;
+    if (!svgRef.current) return;
     
-    isDraggingRef.current = true;
+    // Drag Atom
+    if (interactive && draggedAtomId) {
+       isDraggingRef.current = true;
+       const CTM = svgRef.current.getScreenCTM();
+       if (!CTM) return;
+       
+       const rawX = (e.clientX - CTM.e) / CTM.a;
+       const rawY = (e.clientY - CTM.f) / CTM.d;
 
-    const CTM = svgRef.current.getScreenCTM();
-    if (!CTM) return;
-    
-    const x = (e.clientX - CTM.e) / CTM.a;
-    const y = (e.clientY - CTM.f) / CTM.d;
+       // Apply inverse transform to get model coordinates
+       const x = (rawX - transform.x) / transform.k;
+       const y = (rawY - transform.y) / transform.k;
 
-    const newAtoms = internalMolecule.atoms.map(a => 
-      a.id === draggedAtomId ? { ...a, x, y } : a
-    );
-    
-    const updatedMolecule = { ...internalMolecule, atoms: newAtoms };
-    setInternalMolecule(updatedMolecule);
-    if (onUpdate) onUpdate(updatedMolecule);
+       const newAtoms = internalMolecule.atoms.map(a => 
+         a.id === draggedAtomId ? { ...a, x, y } : a
+       );
+       
+       const updatedMolecule = { ...internalMolecule, atoms: newAtoms };
+       setInternalMolecule(updatedMolecule);
+       if (onUpdate) onUpdate(updatedMolecule);
+    } 
+    // Pan View
+    else if (isPanning && lastPanRef.current) {
+       const dx = e.clientX - lastPanRef.current.x;
+       const dy = e.clientY - lastPanRef.current.y;
+       setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+       lastPanRef.current = { x: e.clientX, y: e.clientY };
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!interactive) return;
-    setDraggedAtomId(null);
+    if (interactive) setDraggedAtomId(null);
+    setIsPanning(false);
+    lastPanRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
@@ -161,7 +207,6 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         const updated = { ...internalMolecule, bonds: updatedBonds };
         setInternalMolecule(updated);
         if (onUpdate) onUpdate(updated);
-        // Note: We keep selectedAtomId active to allow repeated clicks to cycle order
       } else {
         // Create new single bond
         const newBond: BondData = {
@@ -173,7 +218,6 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         const updated = { ...internalMolecule, bonds: [...internalMolecule.bonds, newBond] };
         setInternalMolecule(updated);
         if (onUpdate) onUpdate(updated);
-        // Keep selectedAtomId active
       }
     } else {
       setSelectedAtomId(atomId === selectedAtomId ? null : atomId);
@@ -210,7 +254,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
 
     return (
       <g key={bond.id}>
-         {/* Invisible wide hit area to potentially support bond clicking in future */}
+         {/* Invisible wide hit area */}
          <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke="transparent" strokeWidth="15" />
          {lines.map((l, i) => (
            <line 
@@ -227,7 +271,11 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   };
 
   return (
-    <div className={`relative bg-white select-none ${interactive ? (mode === 'erase' ? 'cursor-pointer' : 'cursor-crosshair') : ''}`} style={{ width, height }}>
+    <div 
+      className={`relative bg-white select-none overflow-hidden ${interactive ? (mode === 'erase' ? 'cursor-pointer' : 'cursor-crosshair') : 'cursor-move'}`} 
+      style={{ width, height }}
+      onWheel={handleWheel}
+    >
       {!internalMolecule.atoms.length && (
          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
             <AtomIcon size={48} className="mb-2 opacity-20" />
@@ -238,50 +286,67 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         ref={svgRef}
         width={width} 
         height={height}
+        onPointerDown={handleSvgPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         className="block bg-transparent"
         viewBox={`0 0 ${width} ${height}`}
       >
-        {/* Render Bonds */}
-        {internalMolecule.bonds.map(bond => renderBond(bond))}
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.k})`}>
+          {/* Render Bonds */}
+          {internalMolecule.bonds.map(bond => renderBond(bond))}
 
-        {/* Render Atoms */}
-        {internalMolecule.atoms.map(atom => {
-          const style = ELEMENT_COLORS[atom.element] || ELEMENT_COLORS[ElementType.C];
-          const isSelected = selectedAtomId === atom.id;
-          const isEraseMode = mode === 'erase';
+          {/* Render Atoms */}
+          {internalMolecule.atoms.map(atom => {
+            const style = ELEMENT_COLORS[atom.element] || ELEMENT_COLORS[ElementType.C];
+            const isSelected = selectedAtomId === atom.id;
+            const isEraseMode = mode === 'erase';
 
-          return (
-            <g 
-              key={atom.id} 
-              transform={`translate(${atom.x}, ${atom.y})`}
-              onPointerDown={(e) => handlePointerDown(e, atom.id)}
-              onClick={(e) => handleAtomClick(e, atom.id)}
-              style={{ cursor: interactive ? (isEraseMode ? 'pointer' : 'grab') : 'default' }}
-              className={`transition-opacity ${isEraseMode ? 'hover:opacity-50' : ''}`}
-            >
-              <circle
-                r={style.radius}
-                fill={style.bg}
-                stroke={isSelected ? '#6366f1' : style.border}
-                strokeWidth={isSelected ? 3 : 2}
-                className="transition-colors duration-150"
-              />
-              <text
-                textAnchor="middle"
-                dy=".35em"
-                fill={style.text}
-                fontSize="14px"
-                fontWeight="bold"
-                pointerEvents="none"
+            return (
+              <g 
+                key={atom.id} 
+                transform={`translate(${atom.x}, ${atom.y})`}
+                onPointerDown={(e) => handleAtomPointerDown(e, atom.id)}
+                onClick={(e) => handleAtomClick(e, atom.id)}
+                style={{ cursor: interactive ? (isEraseMode ? 'pointer' : 'grab') : 'default' }}
+                className={`transition-opacity ${isEraseMode ? 'hover:opacity-50' : ''}`}
               >
-                {atom.element}
-              </text>
-            </g>
-          );
-        })}
+                <circle
+                  r={style.radius}
+                  fill={style.bg}
+                  stroke={isSelected ? '#6366f1' : style.border}
+                  strokeWidth={isSelected ? 3 : 2}
+                  className="transition-colors duration-150"
+                />
+                <text
+                  textAnchor="middle"
+                  dy=".35em"
+                  fill={style.text}
+                  fontSize="14px"
+                  fontWeight="bold"
+                  pointerEvents="none"
+                >
+                  {atom.element}
+                </text>
+              </g>
+            );
+          })}
+        </g>
       </svg>
+      
+      {/* Zoom Controls */}
+      <div className="absolute top-2 right-2 flex flex-col gap-1 bg-white/90 rounded-lg shadow border border-slate-200 p-1">
+         <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
+           <ZoomIn size={16}/>
+         </button>
+         <button onClick={(e) => { e.stopPropagation(); handleZoom(0.8); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
+           <ZoomOut size={16}/>
+         </button>
+         <button onClick={handleResetZoom} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Reset View">
+           <Maximize size={16}/>
+         </button>
+      </div>
+
       {/* Name display for static molecules */}
       {!interactive && (
         <div className="absolute bottom-2 right-2 text-xs text-slate-400 font-mono pointer-events-none">
