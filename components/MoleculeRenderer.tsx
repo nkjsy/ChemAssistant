@@ -13,6 +13,7 @@ interface MoleculeRendererProps {
   isAutoLayout?: boolean; // If true, runs d3 simulation to position atoms
   mode?: 'build' | 'erase';
   onAtomDelete?: (atomId: string) => void;
+  onBondDelete?: (bondId: string) => void;
   showControls?: boolean;
 }
 
@@ -25,6 +26,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   isAutoLayout = false,
   mode = 'build',
   onAtomDelete,
+  onBondDelete,
   showControls = true
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -128,9 +130,12 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
 
   const handleAtomPointerDown = (e: React.PointerEvent, atomId: string) => {
     if (!interactive) return;
+    
+    // Always stop propagation if interactive to prevent background pan from taking over
+    e.stopPropagation();
+
     if (mode === 'erase') return; 
 
-    e.stopPropagation(); // Stop background pan
     e.currentTarget.setPointerCapture(e.pointerId);
     setDraggedAtomId(atomId);
     isDraggingRef.current = false;
@@ -226,6 +231,20 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     }
   };
 
+  const handleBondClick = (e: React.MouseEvent, bondId: string) => {
+    if (!interactive) return;
+    e.stopPropagation();
+
+    if (mode === 'erase' && onBondDelete) {
+      onBondDelete(bondId);
+    }
+  };
+
+  const handleBondPointerDown = (e: React.PointerEvent) => {
+    // Prevent background pan when clicking a bond
+    if (interactive) e.stopPropagation();
+  };
+
   const renderBond = (bond: BondData) => {
     const source = internalMolecule.atoms.find(a => a.id === bond.sourceAtomId);
     const target = internalMolecule.atoms.find(a => a.id === bond.targetAtomId);
@@ -254,8 +273,14 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
        lines.push({ x1: source.x - nx * offset * 1.8, y1: source.y - ny * offset * 1.8, x2: target.x - nx * offset * 1.8, y2: target.y - ny * offset * 1.8 });
     }
 
+    const isEraseMode = interactive && mode === 'erase';
+
     return (
-      <g key={bond.id}>
+      <g key={bond.id} 
+         onClick={(e) => handleBondClick(e, bond.id)}
+         onPointerDown={handleBondPointerDown}
+         className={`transition-opacity ${isEraseMode ? 'cursor-pointer hover:opacity-50' : ''}`}
+      >
          {/* Invisible wide hit area */}
          <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke="transparent" strokeWidth="15" />
          {lines.map((l, i) => (
@@ -263,7 +288,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
              key={i} 
              x1={l.x1} y1={l.y1} 
              x2={l.x2} y2={l.y2} 
-             stroke="#94a3b8" 
+             stroke={isEraseMode ? "#f87171" : "#94a3b8"} 
              strokeWidth="2.5" 
              strokeLinecap="round" 
            />

@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { ElementType, Molecule, AtomData } from '../types';
 import { ELEMENT_COLORS, CANVAS_SIZE } from '../constants';
 import MoleculeRenderer from './MoleculeRenderer';
-import { Trash2, Save, Undo, Eraser, MousePointer2 } from 'lucide-react';
+import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search } from 'lucide-react';
 
 interface BuilderProps {
   onSave: (molecule: Molecule) => void;
+  savedMolecules: Molecule[];
 }
 
-const Builder: React.FC<BuilderProps> = ({ onSave }) => {
+const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules }) => {
   const [currentMolecule, setCurrentMolecule] = useState<Molecule>({
     id: 'temp-builder',
     name: 'New Molecule',
@@ -18,6 +19,8 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
 
   const [history, setHistory] = useState<Molecule[]>([]);
   const [mode, setMode] = useState<'build' | 'erase'>('build');
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Helper to save history before making a state change
   const saveHistory = () => {
@@ -57,6 +60,14 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
     }));
   };
 
+  const handleBondDelete = (bondId: string) => {
+    saveHistory();
+    setCurrentMolecule(prev => ({
+      ...prev,
+      bonds: prev.bonds.filter(b => b.id !== bondId)
+    }));
+  };
+
   const handleMoleculeUpdate = (newMolecule: Molecule) => {
     // Detect if this update was a structural change (bond added via Renderer) to save history
     if (
@@ -78,11 +89,44 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
     });
   };
 
+  const handleLoad = (mol: Molecule) => {
+    // Deep clone to ensure we have a fresh working copy
+    // We keep the ID so we know which molecule we are editing
+    const clone = JSON.parse(JSON.stringify(mol));
+    setCurrentMolecule(clone);
+    setHistory([]); // Clear history when loading new
+    setIsLoadModalOpen(false);
+  };
+
   const handleSave = () => {
     if (currentMolecule.atoms.length === 0) return;
-    onSave({ ...currentMolecule, id: `mol-${Date.now()}` });
+    
+    let moleculeToSave = { ...currentMolecule };
+    
+    // Check if this is an existing molecule (already saved previously)
+    const original = savedMolecules.find(m => m.id === currentMolecule.id);
+    
+    // Logic: 
+    // If it's a new molecule (temp ID) -> Assign new ID.
+    // If it's existing BUT name changed -> Assign new ID (Save As).
+    // If it's existing AND name matches -> Keep ID (Overwrite).
+    
+    if (!original) {
+        // New molecule
+        moleculeToSave.id = `mol-${Date.now()}`;
+    } else if (original.name !== currentMolecule.name) {
+        // Name changed, treat as new "Save As"
+        moleculeToSave.id = `mol-${Date.now()}`;
+    }
+    // else: keep existing ID to overwrite
+
+    onSave(moleculeToSave);
     clearCanvas();
   };
+
+  const filteredSavedMolecules = savedMolecules.filter(m => 
+    m.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -136,7 +180,7 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
         <p className="text-xs text-slate-400 mt-3">
           {mode === 'build' 
             ? "Click elements to add. Drag atoms to move. Click two atoms sequentially to bond." 
-            : "Click on an atom to remove it."}
+            : "Click on an atom or bond to remove it."}
         </p>
       </div>
 
@@ -155,6 +199,7 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
                onUpdate={handleMoleculeUpdate}
                mode={mode}
                onAtomDelete={handleAtomDelete}
+               onBondDelete={handleBondDelete}
              />
              
              {/* Position input on top of SVG using z-10 */}
@@ -174,6 +219,13 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <button 
+          onClick={() => setIsLoadModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
+        >
+          <FolderOpen size={18} />
+          Load
+        </button>
+        <button 
           onClick={clearCanvas}
           className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
         >
@@ -189,6 +241,69 @@ const Builder: React.FC<BuilderProps> = ({ onSave }) => {
           Save Molecule
         </button>
       </div>
+
+      {/* Load Modal */}
+      {isLoadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                 <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                   <FolderOpen size={20} className="text-indigo-600"/> 
+                   Load Molecule
+                 </h3>
+                 <button onClick={() => setIsLoadModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                   <X size={20} />
+                 </button>
+              </div>
+              
+              <div className="p-4 border-b border-slate-100 bg-slate-50">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search your molecules..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                 {savedMolecules.length === 0 ? (
+                   <div className="text-center py-12 text-slate-400">
+                     No saved molecules found. Create and save some!
+                   </div>
+                 ) : filteredSavedMolecules.length === 0 ? (
+                   <div className="text-center py-12 text-slate-400">
+                     No matches found.
+                   </div>
+                 ) : (
+                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {filteredSavedMolecules.map(mol => (
+                        <div 
+                          key={mol.id}
+                          onClick={() => handleLoad(mol)}
+                          className="group relative p-2 border rounded-lg hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all bg-white"
+                        >
+                           <div className="aspect-[4/3] flex items-center justify-center bg-slate-50 rounded border border-slate-100 mb-2 overflow-hidden pointer-events-none">
+                             <MoleculeRenderer molecule={mol} width={150} height={110} showControls={false} />
+                           </div>
+                           <div className="text-sm font-medium text-slate-700 truncate text-center group-hover:text-indigo-600">
+                             {mol.name}
+                           </div>
+                           <div className="text-xs text-slate-400 text-center">
+                             {mol.atoms.length} atoms
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

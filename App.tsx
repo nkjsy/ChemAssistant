@@ -23,7 +23,17 @@ const App: React.FC = () => {
   }, []);
 
   const handleSaveMolecule = (mol: Molecule) => {
-    setSavedMolecules(prev => [...prev, mol]);
+    setSavedMolecules(prev => {
+      const index = prev.findIndex(m => m.id === mol.id);
+      if (index >= 0) {
+        // Overwrite existing molecule
+        const newSaved = [...prev];
+        newSaved[index] = mol;
+        return newSaved;
+      }
+      // Add new molecule
+      return [...prev, mol];
+    });
     // Optional: Switch to lab automatically after save?
     // setActiveTab(Tab.LAB); 
   };
@@ -71,7 +81,7 @@ const App: React.FC = () => {
 
         <div className="h-[calc(100vh-8rem)]">
           {activeTab === Tab.BUILDER ? (
-            <Builder onSave={handleSaveMolecule} />
+            <Builder savedMolecules={savedMolecules} onSave={handleSaveMolecule} />
           ) : (
             <ReactionLab savedMolecules={savedMolecules} onSaveProduct={handleSaveMolecule} />
           )}
