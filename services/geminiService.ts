@@ -36,7 +36,7 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
     
     IMPORTANT: Return the atomic structure (graph) for the products so they can be visualized.
     For the structure of products:
-    - Use standard element symbols (H, C, O, N, Cl, Na, S, F).
+    - Use standard element symbols (H, C, O, N, Cl, Na, S, F, P, Mg, K, Ca, Fe, Br, I).
     - Create a logical connectivity (bonds).
     - 'id' for atoms should be unique integers as strings (e.g., "1", "2").
     - 'order' for bonds is 1 (single), 2 (double), or 3 (triple).

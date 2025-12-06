@@ -6,7 +6,14 @@ export enum ElementType {
   Cl = 'Cl',
   Na = 'Na',
   S = 'S',
-  F = 'F'
+  F = 'F',
+  P = 'P',
+  Mg = 'Mg',
+  K = 'K',
+  Ca = 'Ca',
+  Fe = 'Fe',
+  Br = 'Br',
+  I = 'I'
 }
 
 export interface AtomData {

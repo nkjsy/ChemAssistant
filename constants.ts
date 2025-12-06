@@ -9,6 +9,15 @@ export const ELEMENT_COLORS: Record<ElementType, { bg: string; border: string; t
   [ElementType.Na]: { bg: '#a855f7', border: '#7e22ce', text: '#FFFFFF', radius: 28 },
   [ElementType.S]: { bg: '#eab308', border: '#a16207', text: '#FFFFFF', radius: 26 },
   [ElementType.F]: { bg: '#14b8a6', border: '#0f766e', text: '#FFFFFF', radius: 22 },
+  
+  // New Elements
+  [ElementType.P]: { bg: '#f97316', border: '#c2410c', text: '#FFFFFF', radius: 25 }, // Orange
+  [ElementType.Mg]: { bg: '#10b981', border: '#047857', text: '#FFFFFF', radius: 26 }, // Emerald
+  [ElementType.K]: { bg: '#8b5cf6', border: '#5b21b6', text: '#FFFFFF', radius: 29 }, // Violet
+  [ElementType.Ca]: { bg: '#64748b', border: '#334155', text: '#FFFFFF', radius: 28 }, // Slate
+  [ElementType.Fe]: { bg: '#f59e0b', border: '#b45309', text: '#FFFFFF', radius: 27 }, // Amber/Rust
+  [ElementType.Br]: { bg: '#991b1b', border: '#7f1d1d', text: '#FFFFFF', radius: 27 }, // Dark Red
+  [ElementType.I]: { bg: '#4338ca', border: '#312e81', text: '#FFFFFF', radius: 28 }, // Indigo
 };
 
 export const CANVAS_SIZE = { width: 600, height: 400 };
