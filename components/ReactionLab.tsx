@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Molecule, ReactionResult } from '../types';
 import MoleculeRenderer from './MoleculeRenderer';
 import { simulateReaction } from '../services/geminiService';
-import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw, Search, Plus, Save } from 'lucide-react';
+import { FlaskConical, ArrowRight, Loader2, Beaker, RotateCcw, Search, Plus, Save, Trash2 } from 'lucide-react';
 
 interface ReactionLabProps {
   savedMolecules: Molecule[];
   onSaveProduct: (molecule: Molecule) => void;
+  onDelete: (id: string) => void;
 }
 
-const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct }) => {
+const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct, onDelete }) => {
   const [reactants, setReactants] = useState<Molecule[]>([]);
   const [result, setResult] = useState<ReactionResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,7 +108,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct
                 <div 
                   key={mol.id}
                   onClick={() => toggleReactant(mol)}
-                  className={`relative p-2 rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-indigo-200'}`}
+                  className={`group relative p-2 rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-indigo-200'}`}
                 >
                   <div className="pointer-events-none scale-75 origin-top-left -mb-4">
                      <MoleculeRenderer molecule={mol} width={150} height={100} showControls={false} />
@@ -115,6 +116,7 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct
                   <div className="mt-2 text-xs font-semibold text-center truncate px-1">
                     {mol.name}
                   </div>
+                  
                   {isSelected && (
                     <div className="absolute top-1 right-1 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center">
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,6 +124,17 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct
                       </svg>
                     </div>
                   )}
+
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(mol.id);
+                    }}
+                    className="absolute top-1 left-1 p-1 bg-white/90 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100 z-10"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               );
             })}

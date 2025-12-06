@@ -38,6 +38,12 @@ const App: React.FC = () => {
     // setActiveTab(Tab.LAB); 
   };
 
+  const handleDeleteMolecule = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this molecule?")) {
+      setSavedMolecules(prev => prev.filter(m => m.id !== id));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
@@ -81,9 +87,17 @@ const App: React.FC = () => {
 
         <div className="h-[calc(100vh-8rem)]">
           {activeTab === Tab.BUILDER ? (
-            <Builder savedMolecules={savedMolecules} onSave={handleSaveMolecule} />
+            <Builder 
+              savedMolecules={savedMolecules} 
+              onSave={handleSaveMolecule} 
+              onDelete={handleDeleteMolecule}
+            />
           ) : (
-            <ReactionLab savedMolecules={savedMolecules} onSaveProduct={handleSaveMolecule} />
+            <ReactionLab 
+              savedMolecules={savedMolecules} 
+              onSaveProduct={handleSaveMolecule} 
+              onDelete={handleDeleteMolecule}
+            />
           )}
         </div>
       </main>

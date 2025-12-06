@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { ElementType, Molecule, AtomData } from '../types';
 import { ELEMENT_COLORS, CANVAS_SIZE } from '../constants';
 import MoleculeRenderer from './MoleculeRenderer';
-import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search } from 'lucide-react';
+import { autoLayoutMolecule } from '../services/layoutService';
+import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2 } from 'lucide-react';
 
 interface BuilderProps {
   onSave: (molecule: Molecule) => void;
   savedMolecules: Molecule[];
+  onDelete: (id: string) => void;
 }
 
-const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules }) => {
+const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) => {
   const [currentMolecule, setCurrentMolecule] = useState<Molecule>({
     id: 'temp-builder',
     name: 'New Molecule',
@@ -77,6 +79,13 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules }) => {
       saveHistory();
     }
     setCurrentMolecule(newMolecule);
+  };
+
+  const handleAutoLayout = () => {
+    if (currentMolecule.atoms.length === 0) return;
+    saveHistory();
+    const formattedMolecule = autoLayoutMolecule(currentMolecule, CANVAS_SIZE.width, CANVAS_SIZE.height);
+    setCurrentMolecule(formattedMolecule);
   };
 
   const clearCanvas = () => {
@@ -150,6 +159,13 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules }) => {
                <Eraser size={18} />
              </button>
              <div className="w-px h-5 bg-slate-200 mx-1"></div>
+             <button
+               onClick={handleAutoLayout}
+               className="p-1.5 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+               title="Auto Layout"
+             >
+               <Wand2 size={18} />
+             </button>
              <button
                onClick={handleUndo}
                disabled={history.length === 0}
@@ -296,6 +312,16 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules }) => {
                            <div className="text-xs text-slate-400 text-center">
                              {mol.atoms.length} atoms
                            </div>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               onDelete(mol.id);
+                             }}
+                             className="absolute top-2 right-2 p-1.5 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100"
+                             title="Delete Molecule"
+                           >
+                             <Trash2 size={16} />
+                           </button>
                         </div>
                       ))}
                    </div>
