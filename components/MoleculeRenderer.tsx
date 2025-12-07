@@ -16,6 +16,7 @@ interface MoleculeRendererProps {
   onAtomDelete?: (atomId: string) => void;
   onBondDelete?: (bondId: string) => void;
   showControls?: boolean;
+  autoFit?: boolean; // New prop to fit content to view
 }
 
 const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
@@ -28,7 +29,8 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   mode = 'build',
   onAtomDelete,
   onBondDelete,
-  showControls = true
+  showControls = true,
+  autoFit = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   
@@ -45,7 +47,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   const isDraggingRef = useRef(false);
   const dragStartPosRef = useRef<{ x: number, y: number } | null>(null);
 
-  // Sync internal state with props
+  // Sync internal state with props and handle auto-layout
   useEffect(() => {
     if (isAutoLayout && molecule.atoms.length > 0) {
         // Clone atoms to avoid mutating props during simulation
@@ -96,6 +98,49 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
        }
     }
   }, [molecule, isAutoLayout, width, height, draggedAtomId]);
+
+  // Auto Fit Logic
+  useEffect(() => {
+    // Only apply auto-fit if explicitly enabled, not in auto-layout mode (which handles its own centering),
+    // and if there are atoms to fit.
+    if (autoFit && !isAutoLayout && internalMolecule.atoms.length > 0) {
+       const xs = internalMolecule.atoms.map(a => a.x);
+       const ys = internalMolecule.atoms.map(a => a.y);
+       
+       if (xs.length === 0) return;
+
+       const minX = Math.min(...xs);
+       const maxX = Math.max(...xs);
+       const minY = Math.min(...ys);
+       const maxY = Math.max(...ys);
+       
+       const molWidth = Math.max(maxX - minX, 1);
+       const molHeight = Math.max(maxY - minY, 1);
+       
+       // Add some padding relative to the renderer size
+       const padding = 20; 
+       
+       const availableWidth = Math.max(width - padding * 2, 1);
+       const availableHeight = Math.max(height - padding * 2, 1);
+
+       // Calculate scale to fit
+       const scaleX = availableWidth / molWidth;
+       const scaleY = availableHeight / molHeight;
+       // Use the smaller scale to ensure it fits both dimensions
+       // Limit max scale to avoid making tiny molecules look huge
+       const scale = Math.min(scaleX, scaleY, 1.0); 
+
+       // Calculate center of the molecule
+       const centerX = (minX + maxX) / 2;
+       const centerY = (minY + maxY) / 2;
+
+       // Calculate translation to center the molecule in the viewport
+       const tx = (width / 2) - (centerX * scale);
+       const ty = (height / 2) - (centerY * scale);
+
+       setTransform({ k: scale, x: tx, y: ty });
+    }
+  }, [autoFit, isAutoLayout, width, height, internalMolecule.atoms]); // Dependency on atoms ensures update if molecule changes
 
   // Zoom Logic
   const handleZoom = (factor: number) => {

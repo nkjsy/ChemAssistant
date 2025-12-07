@@ -253,8 +253,8 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
                  onBondDelete={handleBondDelete}
                />
                
-               {/* Position input on top of SVG using z-10 */}
-               <div className="absolute top-4 left-4 z-10">
+               {/* Position input on top of SVG using z-40 to be above the SVG's z-20 */}
+               <div className="absolute top-4 left-4 z-40">
                  <input 
                     type="text" 
                     value={currentMolecule.name}
@@ -350,7 +350,13 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
                           className="group relative p-2 border rounded-lg hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all bg-white"
                         >
                            <div className="aspect-[4/3] flex items-center justify-center bg-slate-50 rounded border border-slate-100 mb-2 overflow-hidden pointer-events-none">
-                             <MoleculeRenderer molecule={mol} width={150} height={110} showControls={false} />
+                             <MoleculeRenderer 
+                               molecule={mol} 
+                               width={150} 
+                               height={110} 
+                               showControls={false} 
+                               autoFit={true}
+                             />
                            </div>
                            <div className="text-sm font-medium text-slate-700 truncate text-center group-hover:text-indigo-600">
                              {mol.name}
