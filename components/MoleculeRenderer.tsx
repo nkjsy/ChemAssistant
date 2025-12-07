@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Molecule, AtomData, BondData, ElementType } from '../types';
-import { ELEMENT_COLORS } from '../constants';
+import { ELEMENT_COLORS, ELEMENT_DATA } from '../constants';
 import { Atom as AtomIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 interface MoleculeRendererProps {
@@ -34,6 +34,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   const [internalMolecule, setInternalMolecule] = useState<Molecule>(molecule);
   const [draggedAtomId, setDraggedAtomId] = useState<string | null>(null);
   const [selectedAtomId, setSelectedAtomId] = useState<string | null>(null);
+  const [hoveredAtomId, setHoveredAtomId] = useState<string | null>(null);
   
   // Zoom and Pan State
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
@@ -142,6 +143,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     setDraggedAtomId(atomId);
     isDraggingRef.current = false;
     dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    setHoveredAtomId(null); // Clear tooltip on drag start
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -257,6 +259,16 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     if (interactive) e.stopPropagation();
   };
 
+  const handleAtomPointerEnter = (atomId: string) => {
+    if (!draggedAtomId && !isPanning) {
+      setHoveredAtomId(atomId);
+    }
+  };
+
+  const handleAtomPointerLeave = () => {
+    setHoveredAtomId(null);
+  };
+
   const renderBond = (bond: BondData) => {
     const source = internalMolecule.atoms.find(a => a.id === bond.sourceAtomId);
     const target = internalMolecule.atoms.find(a => a.id === bond.targetAtomId);
@@ -356,6 +368,8 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
                 transform={`translate(${atom.x}, ${atom.y})`}
                 onPointerDown={(e) => handleAtomPointerDown(e, atom.id)}
                 onClick={(e) => handleAtomClick(e, atom.id)}
+                onPointerEnter={() => handleAtomPointerEnter(atom.id)}
+                onPointerLeave={handleAtomPointerLeave}
                 style={{ cursor: interactive ? (isEraseMode ? 'pointer' : 'grab') : 'default' }}
                 className={`transition-opacity ${isEraseMode ? 'hover:opacity-50' : ''}`}
               >
@@ -382,6 +396,46 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         </g>
       </svg>
       
+      {/* Tooltip */}
+      {hoveredAtomId && !draggedAtomId && !isPanning && (() => {
+          const atom = internalMolecule.atoms.find(a => a.id === hoveredAtomId);
+          if (!atom) return null;
+          const data = ELEMENT_DATA[atom.element];
+          
+          const screenX = transform.x + atom.x * transform.k;
+          const screenY = transform.y + atom.y * transform.k;
+          const radius = (ELEMENT_COLORS[atom.element]?.radius || 20) * transform.k;
+          
+          // Determine if we should show top or bottom based on position
+          const isTooHigh = screenY < 120; // If close to top edge
+          
+          return (
+             <div 
+               className={`absolute z-50 p-3 text-xs text-white bg-slate-900/95 rounded-lg shadow-xl pointer-events-none transform -translate-x-1/2 backdrop-blur-sm border border-slate-700 w-40 transition-all duration-75`}
+               style={{ 
+                 left: screenX, 
+                 top: isTooHigh ? screenY + radius + 10 : screenY - radius - 10,
+                 transform: `translate(-50%, ${isTooHigh ? '0' : '-100%'})`
+               }}
+             >
+                <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-2">
+                   <span className="font-bold text-sm">{data.name}</span>
+                   <span className="font-mono text-lg font-bold text-slate-400">{atom.element}</span>
+                </div>
+                <div className="space-y-1">
+                   <div className="flex justify-between">
+                     <span className="text-slate-400">Atomic No.</span>
+                     <span className="font-mono">{data.atomicNumber}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-slate-400">Mass</span>
+                     <span className="font-mono">{data.mass}</span>
+                   </div>
+                </div>
+             </div>
+          );
+      })()}
+
       {/* Zoom Controls */}
       {showControls && (
         <div className="absolute top-2 right-2 z-50 flex flex-col gap-1 bg-white/95 rounded-lg shadow-md border border-slate-200 p-1 backdrop-blur-sm">

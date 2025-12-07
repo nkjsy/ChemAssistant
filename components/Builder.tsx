@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ElementType, Molecule, AtomData } from '../types';
-import { ELEMENT_COLORS, CANVAS_SIZE } from '../constants';
+import { ELEMENT_COLORS, ELEMENT_DATA, CANVAS_SIZE } from '../constants';
 import MoleculeRenderer from './MoleculeRenderer';
 import { autoLayoutMolecule } from '../services/layoutService';
 import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2 } from 'lucide-react';
@@ -23,6 +23,7 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
   const [mode, setMode] = useState<'build' | 'erase'>('build');
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [hoveredElement, setHoveredElement] = useState<ElementType | null>(null);
 
   // Helper to save history before making a state change
   const saveHistory = () => {
@@ -140,7 +141,7 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Toolbar / Element Palette */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 z-20 relative">
         <div className="flex items-center justify-between mb-3">
            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Elements</h3>
            <div className="flex items-center gap-2">
@@ -180,16 +181,41 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
         <div className="flex flex-wrap gap-2">
           {Object.values(ElementType).map((el) => {
              const style = ELEMENT_COLORS[el];
+             const data = ELEMENT_DATA[el];
+             const isHovered = hoveredElement === el;
+             
              return (
-               <button
-                 key={el}
-                 onClick={() => addAtom(el)}
-                 className="flex items-center justify-center w-10 h-10 rounded-full shadow-sm transition-transform hover:scale-110 active:scale-95 border-2 font-bold"
-                 style={{ backgroundColor: style.bg, borderColor: style.border, color: style.text === '#FFFFFF' ? 'white' : style.text }}
-                 title={`Add ${el}`}
-               >
-                 {el}
-               </button>
+               <div key={el} className="relative">
+                 <button
+                   onClick={() => addAtom(el)}
+                   onMouseEnter={() => setHoveredElement(el)}
+                   onMouseLeave={() => setHoveredElement(null)}
+                   className="flex items-center justify-center w-10 h-10 rounded-full shadow-sm transition-transform hover:scale-110 active:scale-95 border-2 font-bold relative z-10"
+                   style={{ backgroundColor: style.bg, borderColor: style.border, color: style.text === '#FFFFFF' ? 'white' : style.text }}
+                 >
+                   {el}
+                 </button>
+                 {isHovered && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-3 bg-slate-900/95 text-white text-xs rounded-lg shadow-xl pointer-events-none z-50 backdrop-blur-sm border border-slate-700 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-2">
+                            <span className="font-bold text-sm">{data.name}</span>
+                            <span className="font-mono text-lg font-bold text-slate-400">{el}</span>
+                        </div>
+                         <div className="space-y-1">
+                           <div className="flex justify-between">
+                             <span className="text-slate-400">Atomic No.</span>
+                             <span className="font-mono">{data.atomicNumber}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span className="text-slate-400">Mass</span>
+                             <span className="font-mono">{data.mass}</span>
+                           </div>
+                        </div>
+                        {/* Arrow */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95"></div>
+                    </div>
+                 )}
+               </div>
              );
           })}
         </div>
