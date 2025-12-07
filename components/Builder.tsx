@@ -193,9 +193,9 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
              );
           })}
         </div>
-        <p className="text-xs text-slate-400 mt-3">
+        <p className="text-xs text-slate-500 mt-3 font-medium bg-slate-50 p-2 rounded border border-slate-100">
           {mode === 'build' 
-            ? "Click elements to add. Drag atoms to move. Click two atoms sequentially to bond." 
+            ? "💡 Tip: Click elements to add. Drag to move. Click two atoms to bond. Click the target atom repeatedly to cycle single/double/triple bonds." 
             : "Click on an atom or bond to remove it."}
         </p>
       </div>

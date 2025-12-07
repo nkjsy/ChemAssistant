@@ -39,7 +39,9 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const lastPanRef = useRef<{ x: number, y: number } | null>(null);
+  
   const isDraggingRef = useRef(false);
+  const dragStartPosRef = useRef<{ x: number, y: number } | null>(null);
 
   // Sync internal state with props
   useEffect(() => {
@@ -139,6 +141,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     e.currentTarget.setPointerCapture(e.pointerId);
     setDraggedAtomId(atomId);
     isDraggingRef.current = false;
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -146,7 +149,15 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     
     // Drag Atom
     if (interactive && draggedAtomId) {
-       isDraggingRef.current = true;
+       // Check threshold to avoid marking simple clicks as drags due to micro-movement
+       if (!isDraggingRef.current && dragStartPosRef.current) {
+          const dx = e.clientX - dragStartPosRef.current.x;
+          const dy = e.clientY - dragStartPosRef.current.y;
+          // 4px threshold
+          if (Math.sqrt(dx*dx + dy*dy) < 4) return;
+          isDraggingRef.current = true;
+       }
+
        const CTM = svgRef.current.getScreenCTM();
        if (!CTM) return;
        
@@ -178,6 +189,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     if (interactive) setDraggedAtomId(null);
     setIsPanning(false);
     lastPanRef.current = null;
+    dragStartPosRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
@@ -297,16 +309,25 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
     );
   };
 
+  // Grid pattern background
+  const gridPattern = {
+    backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+    backgroundSize: '20px 20px',
+  };
+
   return (
     <div 
       className={`relative bg-white select-none overflow-hidden ${interactive ? (mode === 'erase' ? 'cursor-pointer' : 'cursor-crosshair') : 'cursor-move'}`} 
-      style={{ width, height }}
+      style={{ width, height, ...gridPattern }}
       onWheel={showControls ? handleWheel : undefined}
     >
       {!internalMolecule.atoms.length && (
-         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
-            <AtomIcon size={48} className="mb-2 opacity-20" />
-            <p className="text-sm">Empty Space</p>
+         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none z-10">
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center bg-white/50 backdrop-blur-sm">
+              <AtomIcon size={48} className="mb-3 text-slate-300" />
+              <p className="text-sm font-medium text-slate-500">Empty Workspace</p>
+              {interactive && <p className="text-xs text-slate-400 mt-1">Select elements above to start building</p>}
+            </div>
          </div>
       )}
       <svg 
@@ -316,7 +337,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         onPointerDown={handleSvgPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        className="block bg-transparent"
+        className="block bg-transparent relative z-20"
         viewBox={`0 0 ${width} ${height}`}
       >
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.k})`}>
@@ -363,22 +384,22 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
       
       {/* Zoom Controls */}
       {showControls && (
-        <div className="absolute top-2 right-2 flex flex-col gap-1 bg-white/90 rounded-lg shadow border border-slate-200 p-1">
-           <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
-             <ZoomIn size={16}/>
+        <div className="absolute top-2 right-2 z-50 flex flex-col gap-1 bg-white/95 rounded-lg shadow-md border border-slate-200 p-1 backdrop-blur-sm">
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1.5 hover:bg-slate-100 rounded text-slate-600 active:bg-slate-200" title="Zoom In">
+             <ZoomIn size={18}/>
            </button>
-           <button onClick={(e) => { e.stopPropagation(); handleZoom(0.8); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
-             <ZoomOut size={16}/>
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(0.8); }} className="p-1.5 hover:bg-slate-100 rounded text-slate-600 active:bg-slate-200" title="Zoom Out">
+             <ZoomOut size={18}/>
            </button>
-           <button onClick={handleResetZoom} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Reset View">
-             <Maximize size={16}/>
+           <button onClick={handleResetZoom} className="p-1.5 hover:bg-slate-100 rounded text-slate-600 active:bg-slate-200" title="Reset View">
+             <Maximize size={18}/>
            </button>
         </div>
       )}
 
       {/* Name display for static molecules */}
       {!interactive && (
-        <div className="absolute bottom-2 right-2 text-xs text-slate-400 font-mono pointer-events-none">
+        <div className="absolute bottom-2 right-2 z-30 px-2 py-1 bg-white/80 backdrop-blur rounded text-xs text-slate-500 font-mono pointer-events-none border border-slate-100">
           {internalMolecule.name || 'Untitled'}
         </div>
       )}
