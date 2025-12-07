@@ -1,7 +1,8 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Molecule, AtomData, BondData, ElementType } from '../types';
-import { ELEMENT_COLORS, ELEMENT_DATA } from '../constants';
+import { getElementStyle, ELEMENT_DATA_MAP } from '../constants';
 import { Atom as AtomIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 interface MoleculeRendererProps {
@@ -358,7 +359,7 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
 
           {/* Render Atoms */}
           {internalMolecule.atoms.map(atom => {
-            const style = ELEMENT_COLORS[atom.element] || ELEMENT_COLORS[ElementType.C];
+            const style = getElementStyle(atom.element);
             const isSelected = selectedAtomId === atom.id;
             const isEraseMode = mode === 'erase';
 
@@ -400,11 +401,14 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
       {hoveredAtomId && !draggedAtomId && !isPanning && (() => {
           const atom = internalMolecule.atoms.find(a => a.id === hoveredAtomId);
           if (!atom) return null;
-          const data = ELEMENT_DATA[atom.element];
+          const data = ELEMENT_DATA_MAP[atom.element];
           
+          if (!data) return null;
+
           const screenX = transform.x + atom.x * transform.k;
           const screenY = transform.y + atom.y * transform.k;
-          const radius = (ELEMENT_COLORS[atom.element]?.radius || 20) * transform.k;
+          const style = getElementStyle(atom.element);
+          const radius = (style.radius || 20) * transform.k;
           
           // Determine if we should show top or bottom based on position
           const isTooHigh = screenY < 120; // If close to top edge
@@ -430,6 +434,10 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
                    <div className="flex justify-between">
                      <span className="text-slate-400">Mass</span>
                      <span className="font-mono">{data.mass}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-slate-400">Category</span>
+                     <span className="font-mono capitalize truncate ml-2">{data.category.replace(/ /g, ' ')}</span>
                    </div>
                 </div>
              </div>

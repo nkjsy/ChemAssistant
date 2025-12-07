@@ -1,20 +1,25 @@
-export enum ElementType {
-  H = 'H',
-  C = 'C',
-  O = 'O',
-  N = 'N',
-  Cl = 'Cl',
-  Na = 'Na',
-  S = 'S',
-  F = 'F',
-  P = 'P',
-  Mg = 'Mg',
-  K = 'K',
-  Ca = 'Ca',
-  Fe = 'Fe',
-  Br = 'Br',
-  I = 'I'
-}
+
+// Common elements for the quick-access bar
+export const ElementType = {
+  H: 'H',
+  C: 'C',
+  O: 'O',
+  N: 'N',
+  Cl: 'Cl',
+  Na: 'Na',
+  S: 'S',
+  F: 'F',
+  P: 'P',
+  Mg: 'Mg',
+  K: 'K',
+  Ca: 'Ca',
+  Fe: 'Fe',
+  Br: 'Br',
+  I: 'I'
+} as const;
+
+// Allow any string to support all 118 elements
+export type ElementType = typeof ElementType[keyof typeof ElementType] | string;
 
 export interface AtomData {
   id: string;

@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { ElementType, Molecule, AtomData } from '../types';
-import { ELEMENT_COLORS, ELEMENT_DATA, CANVAS_SIZE } from '../constants';
+import { getElementStyle, ELEMENT_DATA_MAP, CANVAS_SIZE, COMMON_ELEMENTS } from '../constants';
 import MoleculeRenderer from './MoleculeRenderer';
 import { autoLayoutMolecule } from '../services/layoutService';
-import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2 } from 'lucide-react';
+import PeriodicTable from './PeriodicTable';
+import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2, TableProperties } from 'lucide-react';
 
 interface BuilderProps {
   onSave: (molecule: Molecule) => void;
@@ -22,8 +24,9 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
   const [history, setHistory] = useState<Molecule[]>([]);
   const [mode, setMode] = useState<'build' | 'erase'>('build');
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [isPeriodicTableOpen, setIsPeriodicTableOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [hoveredElement, setHoveredElement] = useState<ElementType | null>(null);
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
   // Helper to save history before making a state change
   const saveHistory = () => {
@@ -41,7 +44,7 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
     saveHistory();
     // Add atom slightly randomised near center
     const newAtom: AtomData = {
-      id: `atom-${Date.now()}`,
+      id: `atom-${Date.now()}-${Math.floor(Math.random()*1000)}`,
       element,
       x: CANVAS_SIZE.width / 2 + (Math.random() - 0.5) * 60,
       y: CANVAS_SIZE.height / 2 + (Math.random() - 0.5) * 60
@@ -139,150 +142,167 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
   );
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Toolbar / Element Palette */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 z-20 relative">
-        <div className="flex items-center justify-between mb-3">
-           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Elements</h3>
-           <div className="flex items-center gap-2">
-             <button
-               onClick={() => setMode('build')}
-               className={`p-1.5 rounded transition-colors ${mode === 'build' ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
-               title="Build Mode"
-             >
-               <MousePointer2 size={18} />
-             </button>
-             <button
-               onClick={() => setMode('erase')}
-               className={`p-1.5 rounded transition-colors ${mode === 'erase' ? 'bg-red-100 text-red-700 ring-2 ring-red-500' : 'text-slate-400 hover:text-slate-600'}`}
-               title="Eraser Mode"
-             >
-               <Eraser size={18} />
-             </button>
-             <div className="w-px h-5 bg-slate-200 mx-1"></div>
-             <button
-               onClick={handleAutoLayout}
-               className="p-1.5 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
-               title="Auto Layout"
-             >
-               <Wand2 size={18} />
-             </button>
-             <button
-               onClick={handleUndo}
-               disabled={history.length === 0}
-               className="p-1.5 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-               title="Undo"
-             >
-               <Undo size={18} />
-             </button>
-           </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {Object.values(ElementType).map((el) => {
-             const style = ELEMENT_COLORS[el];
-             const data = ELEMENT_DATA[el];
-             const isHovered = hoveredElement === el;
-             
-             return (
-               <div key={el} className="relative">
-                 <button
-                   onClick={() => addAtom(el)}
-                   onMouseEnter={() => setHoveredElement(el)}
-                   onMouseLeave={() => setHoveredElement(null)}
-                   className="flex items-center justify-center w-10 h-10 rounded-full shadow-sm transition-transform hover:scale-110 active:scale-95 border-2 font-bold relative z-10"
-                   style={{ backgroundColor: style.bg, borderColor: style.border, color: style.text === '#FFFFFF' ? 'white' : style.text }}
-                 >
-                   {el}
-                 </button>
-                 {isHovered && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-3 bg-slate-900/95 text-white text-xs rounded-lg shadow-xl pointer-events-none z-50 backdrop-blur-sm border border-slate-700 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-2">
-                            <span className="font-bold text-sm">{data.name}</span>
-                            <span className="font-mono text-lg font-bold text-slate-400">{el}</span>
-                        </div>
-                         <div className="space-y-1">
-                           <div className="flex justify-between">
-                             <span className="text-slate-400">Atomic No.</span>
-                             <span className="font-mono">{data.atomicNumber}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span className="text-slate-400">Mass</span>
-                             <span className="font-mono">{data.mass}</span>
-                           </div>
-                        </div>
-                        {/* Arrow */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95"></div>
-                    </div>
-                 )}
-               </div>
-             );
-          })}
-        </div>
-        <p className="text-xs text-slate-500 mt-3 font-medium bg-slate-50 p-2 rounded border border-slate-100">
-          {mode === 'build' 
-            ? "💡 Tip: Click elements to add. Drag to move. Click two atoms to bond. Click the target atom repeatedly to cycle single/double/triple bonds." 
-            : "Click on an atom or bond to remove it."}
-        </p>
-      </div>
-
-      {/* Canvas Area - Centered and Scrollable */}
-      <div className="flex-1 flex flex-col relative bg-slate-100/50 rounded-xl border border-slate-200 overflow-hidden">
-        <div className="absolute inset-0 overflow-auto flex items-center justify-center p-8">
-           <div 
-             className="relative bg-white shadow-xl rounded-lg overflow-hidden shrink-0" 
-             style={{ width: CANVAS_SIZE.width, height: CANVAS_SIZE.height }}
-           >
-             <MoleculeRenderer 
-               molecule={currentMolecule} 
-               width={CANVAS_SIZE.width} 
-               height={CANVAS_SIZE.height} 
-               interactive={true}
-               onUpdate={handleMoleculeUpdate}
-               mode={mode}
-               onAtomDelete={handleAtomDelete}
-               onBondDelete={handleBondDelete}
-             />
-             
-             {/* Position input on top of SVG using z-10 */}
-             <div className="absolute top-4 left-4 z-10">
-               <input 
-                  type="text" 
-                  value={currentMolecule.name}
-                  onChange={(e) => setCurrentMolecule(prev => ({ ...prev, name: e.target.value }))}
-                  className="bg-white/90 backdrop-blur border border-slate-300 rounded px-2 py-1 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none w-48 shadow-sm"
-                  placeholder="Molecule Name"
-               />
+    <div className="flex h-full gap-4 relative overflow-hidden">
+      {/* Main Builder Content */}
+      <div className="flex flex-col flex-1 h-full gap-4 min-w-0 transition-all">
+        {/* Toolbar / Element Palette */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 z-20 relative">
+          <div className="flex items-center justify-between mb-3">
+             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Builder Tools</h3>
+             <div className="flex items-center gap-2">
+               <button
+                 onClick={() => setMode('build')}
+                 className={`p-1.5 rounded transition-colors ${mode === 'build' ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
+                 title="Build Mode"
+               >
+                 <MousePointer2 size={18} />
+               </button>
+               <button
+                 onClick={() => setMode('erase')}
+                 className={`p-1.5 rounded transition-colors ${mode === 'erase' ? 'bg-red-100 text-red-700 ring-2 ring-red-500' : 'text-slate-400 hover:text-slate-600'}`}
+                 title="Eraser Mode"
+               >
+                 <Eraser size={18} />
+               </button>
+               <div className="w-px h-5 bg-slate-200 mx-1"></div>
+               <button
+                 onClick={handleAutoLayout}
+                 className="p-1.5 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+                 title="Auto Layout"
+               >
+                 <Wand2 size={18} />
+               </button>
+               <button
+                 onClick={handleUndo}
+                 disabled={history.length === 0}
+                 className="p-1.5 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                 title="Undo"
+               >
+                 <Undo size={18} />
+               </button>
+               <div className="w-px h-5 bg-slate-200 mx-1"></div>
+               <button
+                 onClick={() => setIsPeriodicTableOpen(true)}
+                 className="p-1.5 rounded text-indigo-600 bg-indigo-50 hover:bg-indigo-100 ring-1 ring-indigo-200 transition-colors flex items-center gap-2 px-3"
+                 title="Open Periodic Table"
+               >
+                 <TableProperties size={18} />
+                 <span className="text-xs font-semibold">Periodic Table</span>
+               </button>
              </div>
-           </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {COMMON_ELEMENTS.map((el) => {
+               const style = getElementStyle(el);
+               const data = ELEMENT_DATA_MAP[el];
+               const isHovered = hoveredElement === el;
+               
+               return (
+                 <div key={el} className="relative">
+                   <button
+                     onClick={() => addAtom(el)}
+                     onMouseEnter={() => setHoveredElement(el)}
+                     onMouseLeave={() => setHoveredElement(null)}
+                     className="flex items-center justify-center w-10 h-10 rounded-full shadow-sm transition-transform hover:scale-110 active:scale-95 border-2 font-bold relative z-10"
+                     style={{ backgroundColor: style.bg, borderColor: style.border, color: style.text }}
+                   >
+                     {el}
+                   </button>
+                   {isHovered && data && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-3 bg-slate-900/95 text-white text-xs rounded-lg shadow-xl pointer-events-none z-50 backdrop-blur-sm border border-slate-700 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-2">
+                              <span className="font-bold text-sm">{data.name}</span>
+                              <span className="font-mono text-lg font-bold text-slate-400">{el}</span>
+                          </div>
+                           <div className="space-y-1">
+                             <div className="flex justify-between">
+                               <span className="text-slate-400">Atomic No.</span>
+                               <span className="font-mono">{data.atomicNumber}</span>
+                             </div>
+                             <div className="flex justify-between">
+                               <span className="text-slate-400">Mass</span>
+                               <span className="font-mono">{data.mass}</span>
+                             </div>
+                          </div>
+                          {/* Arrow */}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95"></div>
+                      </div>
+                   )}
+                 </div>
+               );
+            })}
+          </div>
+        </div>
+
+        {/* Canvas Area - Centered and Scrollable */}
+        <div className="flex-1 flex flex-col relative bg-slate-100/50 rounded-xl border border-slate-200 overflow-hidden">
+          <div className="absolute inset-0 overflow-auto flex items-center justify-center p-8">
+             <div 
+               className="relative bg-white shadow-xl rounded-lg overflow-hidden shrink-0" 
+               style={{ width: CANVAS_SIZE.width, height: CANVAS_SIZE.height }}
+             >
+               <MoleculeRenderer 
+                 molecule={currentMolecule} 
+                 width={CANVAS_SIZE.width} 
+                 height={CANVAS_SIZE.height} 
+                 interactive={true}
+                 onUpdate={handleMoleculeUpdate}
+                 mode={mode}
+                 onAtomDelete={handleAtomDelete}
+                 onBondDelete={handleBondDelete}
+               />
+               
+               {/* Position input on top of SVG using z-10 */}
+               <div className="absolute top-4 left-4 z-10">
+                 <input 
+                    type="text" 
+                    value={currentMolecule.name}
+                    onChange={(e) => setCurrentMolecule(prev => ({ ...prev, name: e.target.value }))}
+                    className="bg-white/90 backdrop-blur border border-slate-300 rounded px-2 py-1 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none w-48 shadow-sm"
+                    placeholder="Molecule Name"
+                 />
+               </div>
+             </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          <button 
+            onClick={() => setIsLoadModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
+          >
+            <FolderOpen size={18} />
+            Load
+          </button>
+          <button 
+            onClick={clearCanvas}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <Trash2 size={18} />
+            Clear
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={currentMolecule.atoms.length === 0}
+            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={18} />
+            Save Molecule
+          </button>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <button 
-          onClick={() => setIsLoadModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
-        >
-          <FolderOpen size={18} />
-          Load
-        </button>
-        <button 
-          onClick={clearCanvas}
-          className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          <Trash2 size={18} />
-          Clear
-        </button>
-        <button 
-          onClick={handleSave}
-          disabled={currentMolecule.atoms.length === 0}
-          className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save size={18} />
-          Save Molecule
-        </button>
-      </div>
+      {/* Periodic Table Sidebar */}
+      <PeriodicTable 
+        isOpen={isPeriodicTableOpen} 
+        onClose={() => setIsPeriodicTableOpen(false)}
+        onSelect={(element) => {
+          addAtom(element);
+          // Optional: Keep open or close. Let's keep open for rapid addition.
+        }}
+      />
 
       {/* Load Modal */}
       {isLoadModalOpen && (
