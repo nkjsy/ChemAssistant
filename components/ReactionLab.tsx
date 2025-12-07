@@ -59,10 +59,27 @@ const ReactionLab: React.FC<ReactionLabProps> = ({ savedMolecules, onSaveProduct
 
   const confirmSave = () => {
     if (editingProduct && newName.trim()) {
+      const trimmedName = newName.trim();
+      
+      // Check for name collision
+      const existingMolecule = savedMolecules.find(
+        m => m.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      let saveId = `saved-prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      if (existingMolecule) {
+        if (window.confirm(`A molecule named "${trimmedName}" already exists. Do you want to overwrite it?`)) {
+           saveId = existingMolecule.id; // Reuse ID to overwrite
+        } else {
+           return; // Cancel save
+        }
+      }
+
       onSaveProduct({
         ...editingProduct,
-        name: newName.trim(),
-        id: `saved-prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        name: trimmedName,
+        id: saveId
       });
       setEditingProduct(null);
     }

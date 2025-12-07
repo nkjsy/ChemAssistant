@@ -4,8 +4,9 @@ import { ElementType, Molecule, AtomData } from '../types';
 import { getElementStyle, ELEMENT_DATA_MAP, CANVAS_SIZE, COMMON_ELEMENTS } from '../constants';
 import MoleculeRenderer from './MoleculeRenderer';
 import { autoLayoutMolecule } from '../services/layoutService';
+import { identifyMolecule } from '../services/geminiService';
 import PeriodicTable from './PeriodicTable';
-import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2, TableProperties } from 'lucide-react';
+import { Trash2, Save, Undo, Eraser, MousePointer2, FolderOpen, X, Search, Wand2, TableProperties, Loader2 } from 'lucide-react';
 
 interface BuilderProps {
   onSave: (molecule: Molecule) => void;
@@ -24,8 +25,11 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
   const [history, setHistory] = useState<Molecule[]>([]);
   const [mode, setMode] = useState<'build' | 'erase'>('build');
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isPeriodicTableOpen, setIsPeriodicTableOpen] = useState(false);
+  const [isIdentifying, setIsIdentifying] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [saveName, setSaveName] = useState('');
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
   // Helper to save history before making a state change
@@ -111,10 +115,51 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
     setIsLoadModalOpen(false);
   };
 
-  const handleSave = () => {
-    if (currentMolecule.atoms.length === 0) return;
+  const generateFormula = (atoms: AtomData[]) => {
+    if (atoms.length === 0) return '';
+    const counts: Record<string, number> = {};
+    atoms.forEach(a => {
+      counts[a.element] = (counts[a.element] || 0) + 1;
+    });
     
-    let moleculeToSave = { ...currentMolecule };
+    // Sort logic: C, H, then alphabetical (Simplified Hill System)
+    const elements = Object.keys(counts).sort((a, b) => {
+      if (a === 'C') return -1;
+      if (b === 'C') return 1;
+      if (a === 'H' && b !== 'C') return -1;
+      if (b === 'H' && a !== 'C') return 1;
+      return a.localeCompare(b);
+    });
+    
+    return elements.map(el => `${el}${counts[el] > 1 ? counts[el] : ''}`).join('');
+  };
+
+  const initiateSave = async () => {
+    if (currentMolecule.atoms.length === 0) return;
+
+    let suggestion = currentMolecule.name;
+    // Suggest identify if name is still default
+    if (suggestion === 'New Molecule' || !suggestion.trim()) {
+       setIsIdentifying(true);
+       try {
+         const name = await identifyMolecule(currentMolecule);
+         if (name && name !== 'Unknown Structure') {
+           suggestion = name;
+         } else {
+           suggestion = generateFormula(currentMolecule.atoms);
+         }
+       } catch (error) {
+         suggestion = generateFormula(currentMolecule.atoms);
+       } finally {
+         setIsIdentifying(false);
+       }
+    }
+    setSaveName(suggestion);
+    setIsSaveModalOpen(true);
+  };
+
+  const confirmSave = () => {
+    let moleculeToSave = { ...currentMolecule, name: saveName };
     
     // Check if this is an existing molecule (already saved previously)
     const original = savedMolecules.find(m => m.id === currentMolecule.id);
@@ -127,13 +172,14 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
     if (!original) {
         // New molecule
         moleculeToSave.id = `mol-${Date.now()}`;
-    } else if (original.name !== currentMolecule.name) {
+    } else if (original.name !== saveName) {
         // Name changed, treat as new "Save As"
         moleculeToSave.id = `mol-${Date.now()}`;
     }
     // else: keep existing ID to overwrite
 
     onSave(moleculeToSave);
+    setIsSaveModalOpen(false);
     clearCanvas();
   };
 
@@ -284,12 +330,12 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
             Clear
           </button>
           <button 
-            onClick={handleSave}
-            disabled={currentMolecule.atoms.length === 0}
+            onClick={initiateSave}
+            disabled={currentMolecule.atoms.length === 0 || isIdentifying}
             className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save size={18} />
-            Save Molecule
+            {isIdentifying ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+            {isIdentifying ? 'Identifying...' : 'Save Molecule'}
           </button>
         </div>
       </div>
@@ -380,6 +426,49 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
                  )}
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Save Confirmation Modal */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Save className="text-indigo-600" size={20} />
+                  Save Molecule
+                </h3>
+                
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Molecule Name</label>
+                    <input 
+                        type="text" 
+                        value={saveName}
+                        onChange={(e) => setSaveName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        autoFocus
+                        placeholder="e.g. Water"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      Give your creation a name to find it easily in the inventory.
+                    </p>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                    <button 
+                        onClick={() => setIsSaveModalOpen(false)}
+                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={confirmSave}
+                        disabled={!saveName.trim()}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium transition-colors"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>

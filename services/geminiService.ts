@@ -1,5 +1,7 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Molecule, ReactionResult, ElementType } from '../types';
+import { autoLayoutMolecule } from './layoutService';
 
 const getClient = () => {
   const apiKey = process.env.API_KEY;
@@ -7,6 +9,52 @@ const getClient = () => {
     throw new Error("API Key not found");
   }
   return new GoogleGenAI({ apiKey });
+};
+
+/**
+ * Identifies a molecule based on its atoms and bonds using Gemini.
+ */
+export const identifyMolecule = async (molecule: Molecule): Promise<string> => {
+  const ai = getClient();
+
+  const atomList = molecule.atoms.map(a => `${a.element} (id:${a.id})`).join(', ');
+  const bondList = molecule.bonds.map(b => `${b.sourceAtomId}-${b.targetAtomId} (order:${b.order})`).join(', ');
+  
+  // Calculate formula locally as a fallback hint
+  const counts: Record<string, number> = {};
+  molecule.atoms.forEach(a => {
+    counts[a.element] = (counts[a.element] || 0) + 1;
+  });
+  const formula = Object.entries(counts).map(([el, count]) => `${el}${count > 1 ? count : ''}`).join('');
+
+  const systemInstruction = `
+    You are an expert chemist.
+    User provides a list of atoms and bonds representing a molecule.
+    Your task is to identify the common name of this molecule.
+    If it has a well-known common name (e.g., Water, Ethanol, Aspirin, Caffeine), use that.
+    Otherwise, use the IUPAC name.
+    If it's an invalid or disconnected structure, return "Unknown Structure".
+    Return ONLY the name as a plain string, no markdown, no explanation.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Atoms: ${atomList}\nBonds: ${bondList}\nFormula Hint: ${formula}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "text/plain",
+      }
+    });
+    
+    let name = response.text?.trim();
+    // Fallback if AI returns nothing or error text
+    if (!name || name.length > 50) return formula;
+    return name;
+  } catch (error) {
+    console.error("Identification failed", error);
+    return formula; // Fallback to formula
+  }
 };
 
 /**
@@ -111,15 +159,15 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
         atomIdSet.has(b.source) && atomIdSet.has(b.target)
       );
 
-      return {
+      const rawMolecule = {
         id: `product-${index}-${Date.now()}`,
         name: p.name || "Product",
-        // Initialize with slight random jitter to prevent d3 stacking issues at (0,0)
+        // Initialize with basic coordinates, layout service will fix them
         atoms: validAtoms.map((a: any) => ({
           id: String(a.id),
           element: a.element as ElementType, 
-          x: Math.random() * 50, 
-          y: Math.random() * 50
+          x: 0, 
+          y: 0
         })),
         bonds: validBonds.map((b: any, bIndex: number) => ({
           id: `bond-${index}-${bIndex}`,
@@ -128,6 +176,10 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
           order: b.order || 1
         }))
       };
+
+      // Apply auto-layout to ensure the molecule has a valid visual structure before returning
+      // Using a standard 400x300 box for the initial layout
+      return autoLayoutMolecule(rawMolecule, 400, 300);
     });
 
     return {
