@@ -489,9 +489,9 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
           );
       })()}
 
-      {/* Zoom Controls */}
+      {/* Zoom Controls - Moved to bottom right */}
       {showControls && (
-        <div className="absolute top-2 right-2 z-50 flex flex-col gap-1 bg-white/95 rounded-lg shadow-md border border-slate-200 p-1 backdrop-blur-sm">
+        <div className="absolute bottom-4 right-4 z-50 flex flex-col gap-1 bg-white/95 rounded-lg shadow-md border border-slate-200 p-1 backdrop-blur-sm">
            <button onClick={(e) => { e.stopPropagation(); handleZoom(1.2); }} className="p-1.5 hover:bg-slate-100 rounded text-slate-600 active:bg-slate-200" title="Zoom In">
              <ZoomIn size={18}/>
            </button>
@@ -504,9 +504,9 @@ const MoleculeRenderer: React.FC<MoleculeRendererProps> = ({
         </div>
       )}
 
-      {/* Name display for static molecules */}
+      {/* Name display for static molecules - Moved to bottom left */}
       {!interactive && (
-        <div className="absolute bottom-2 right-2 z-30 px-2 py-1 bg-white/80 backdrop-blur rounded text-xs text-slate-500 font-mono pointer-events-none border border-slate-100">
+        <div className="absolute bottom-4 left-4 z-30 px-2 py-1 bg-white/80 backdrop-blur rounded text-xs text-slate-500 font-mono pointer-events-none border border-slate-100">
           {internalMolecule.name || 'Untitled'}
         </div>
       )}

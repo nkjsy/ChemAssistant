@@ -300,7 +300,8 @@ const Builder: React.FC<BuilderProps> = ({ onSave, savedMolecules, onDelete }) =
                />
                
                {/* Position input on top of SVG using z-40 to be above the SVG's z-20 */}
-               <div className="absolute top-4 left-4 z-40">
+               {/* Moved to bottom-left to avoid overlap with builder tools */}
+               <div className="absolute bottom-4 left-4 z-40">
                  <input 
                     type="text" 
                     value={currentMolecule.name}
