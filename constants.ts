@@ -144,7 +144,7 @@ export const ELEMENT_DATA_MAP = PERIODIC_TABLE.reduce((acc, el) => {
 
 // Common elements list for the toolbar
 export const COMMON_ELEMENTS = [
-  'H', 'C', 'O', 'N', 'Cl', 'Na', 'S', 'F', 'P', 'Mg', 'K', 'Ca', 'Fe', 'Br', 'I'
+  'H', 'C', 'O', 'N', 'Cl', 'Na', 'S', 'F', 'P'
 ];
 
 // Custom colors for specific common elements (matching previous styles)
