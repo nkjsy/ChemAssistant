@@ -39,7 +39,7 @@ export const identifyMolecule = async (molecule: Molecule): Promise<string> => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-pro-preview",
       contents: `Atoms: ${atomList}\nBonds: ${bondList}\nFormula Hint: ${formula}`,
       config: {
         systemInstruction,
@@ -93,7 +93,7 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-pro-preview",
       contents: `Reactants: ${reactantDescriptions}`,
       config: {
         systemInstruction,
@@ -116,7 +116,8 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
                       properties: {
                         id: { type: Type.STRING },
                         element: { type: Type.STRING },
-                      }
+                      },
+                      required: ["id", "element"]
                     }
                   },
                   bonds: {
@@ -127,13 +128,16 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
                         source: { type: Type.STRING },
                         target: { type: Type.STRING },
                         order: { type: Type.INTEGER }
-                      }
+                      },
+                      required: ["source", "target", "order"]
                     }
                   }
-                }
+                },
+                required: ["name", "atoms", "bonds"]
               }
             }
-          }
+          },
+          required: ["equation", "explanation", "products"]
         }
       }
     });
@@ -162,12 +166,12 @@ export const simulateReaction = async (reactants: Molecule[]): Promise<ReactionR
       const rawMolecule = {
         id: `product-${index}-${Date.now()}`,
         name: p.name || "Product",
-        // Initialize with basic coordinates, layout service will fix them
+        // Initialize with RANDOM coordinates to prevent D3 layout singularity
         atoms: validAtoms.map((a: any) => ({
           id: String(a.id),
           element: a.element as ElementType, 
-          x: 0, 
-          y: 0
+          x: Math.random() * 400, 
+          y: Math.random() * 300
         })),
         bonds: validBonds.map((b: any, bIndex: number) => ({
           id: `bond-${index}-${bIndex}`,

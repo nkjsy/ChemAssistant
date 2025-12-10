@@ -1,3 +1,4 @@
+
 import * as d3 from 'd3';
 import { Molecule } from '../types';
 
@@ -9,7 +10,13 @@ export const autoLayoutMolecule = (molecule: Molecule, width: number, height: nu
     if (molecule.atoms.length === 0) return molecule;
 
     // Clone data to avoid mutating the original state directly during simulation setup
-    const nodes = molecule.atoms.map(a => ({ ...a }));
+    // Initialize random positions if atoms are at (0,0) or stacked, to allow forces to work
+    const nodes = molecule.atoms.map(a => ({ 
+        ...a,
+        x: (a.x === 0 && a.y === 0) ? width/2 + (Math.random() - 0.5) * 50 : a.x,
+        y: (a.x === 0 && a.y === 0) ? height/2 + (Math.random() - 0.5) * 50 : a.y
+    }));
+
     const links = molecule.bonds.map(b => ({ 
         ...b, 
         source: b.sourceAtomId, 
